@@ -1,0 +1,119 @@
+# ============================================================
+# Unreal Engine
+# ============================================================
+
+# Cartelle generate automaticamente da Unreal Engine
+# ** permette di ignorarle anche dentro sottocartelle e plugin
+**/Binaries/
+**/DerivedDataCache/
+**/Intermediate/
+**/Saved/
+
+# Cartelle generate dai plugin
+**/Plugins/**/Binaries/
+**/Plugins/**/Intermediate/
+
+# File temporanei e cache di Unreal
+*.tmp
+*.log
+*.cache
+*.bin
+*.pdb
+*.exp
+*.ilk
+*.iobj
+*.ipdb
+
+# ============================================================
+# Visual Studio e IDE
+# ============================================================
+
+**/.vs/
+**/.vscode/
+**/.idea/
+
+*.sln
+*.slnx
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.user
+*.userprefs
+*.vsconfig
+
+# ============================================================
+# File di compilazione C/C++
+# ============================================================
+
+# Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled headers
+*.gch
+*.pch
+
+# Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+*.ipa
+
+# Fortran module files
+*.mod
+
+# ============================================================
+# File generati per altre piattaforme
+# ============================================================
+
+*.xcodeproj
+*.xcworkspace
+
+# ============================================================
+# Source Art precompilata
+# ============================================================
+
+**/SourceArt/**/*.png
+**/SourceArt/**/*.tga
+
+# ============================================================
+# Build
+# ============================================================
+
+# Ignora i file generati nelle cartelle Build
+**/Build/*
+
+# Mantiene accessibili le sottocartelle
+!**/Build/*/
+
+# Ignora il contenuto delle sottocartelle Build
+**/Build/*/**
+
+# Mantiene i file di configurazione Pak
+!**/Build/*/PakBlacklist*.txt
+
+# Mantiene le icone del progetto
+!**/Build/**/*.ico
+
+# ============================================================
+# Sistema operativo
+# ============================================================
+
+.DS_Store
+Thumbs.db
+Desktop.ini
