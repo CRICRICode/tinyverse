@@ -48,6 +48,10 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	UInputAction* MouseLookAction;
+	
+	/**  Debug gravity arrow*/
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Debug|Gravity")
+	bool bShowGravityDebug=false;
 
 public:
 
@@ -55,6 +59,10 @@ public:
 	ATinyverseCharacter();	
 
 protected:
+
+	virtual void BeginPlay() override;
+
+	virtual void Tick(float DeltaSeconds) override;
 
 	/** Initialize input action bindings */
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -92,5 +100,76 @@ public:
 
 	/** Returns FollowCamera subobject **/
 	FORCEINLINE class UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+private:
+
+	FVector GetLocalUp() const;
+
+	void InitializeGravityAlignedCamera();
+
+	void AlignCameraFrameToUp(const FVector& LocalUp);
+
+	void UpdateAutomaticCamera(float DeltaSeconds, const FVector& LocalUp);
+
+	void UpdateCharacterFacing(float DeltaSeconds, const FVector& LocalUp);
+
+	void ApplyGravityAlignedCamera();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
+	float CharacterTurnSpeed = 12.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
+	float CameraYawSensitivity = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
+	float CameraPitchSensitivity = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Input", meta=(AllowPrivateAccess="true"))
+	bool bInvertHorizontalCamera = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Input", meta=(AllowPrivateAccess="true"))
+	bool bInvertVerticalCamera = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet", meta=(AllowPrivateAccess="true", ClampMin="-89.0", ClampMax="89.0"))
+	float MinimumCameraPitch = -70.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet", meta=(AllowPrivateAccess="true", ClampMin="-89.0", ClampMax="89.0"))
+	float MaximumCameraPitch = 60.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet", meta=(AllowPrivateAccess="true", ClampMin="-89.0", ClampMax="89.0"))
+	float InitialCameraPitch = -20.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Automatic", meta=(AllowPrivateAccess="true"))
+	bool bEnableAutomaticCamera = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Automatic", meta=(AllowPrivateAccess="true", ClampMin="0.0"))
+	float AutomaticCameraDelay = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Automatic", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
+	float AutomaticCameraYawSpeed = 3.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Automatic", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
+	float AutomaticCameraPitchSpeed = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Automatic", meta=(AllowPrivateAccess="true", ClampMin="-89.0", ClampMax="89.0"))
+	float AutomaticCameraPitch = -20.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Automatic", meta=(AllowPrivateAccess="true", ClampMin="0.0"))
+	float AutomaticCameraMinimumSpeed = 30.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet|Composition", meta=(AllowPrivateAccess="true"))
+	float CameraTargetHeight = 60.0f;
+
+	FVector CameraYawForward = FVector::ForwardVector;
+
+	FVector DesiredFacingDirection = FVector::ZeroVector;
+
+	FVector PreviousLocalUp = FVector::UpVector;
+
+	float CameraPitch = 0.0f;
+
+	float TimeSinceLastCameraInput = 0.0f;
+
+	bool bGravityAlignedCameraInitialized = false;
 };
 
