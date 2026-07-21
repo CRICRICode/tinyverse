@@ -72,6 +72,9 @@ protected:
 	/** Called for movement input */
 	void Move(const FInputActionValue& Value);
 
+	/** Called when movement input ends */
+	void StopMove(const FInputActionValue& Value);
+
 	/** Called for looking input */
 	void Look(const FInputActionValue& Value);
 
@@ -169,6 +172,8 @@ private:
 	float CameraPitch = 0.0f;
 
 	float TimeSinceLastCameraInput = 0.0f;
+
+	float ForwardMovementInput = 0.0f;
 
 	bool bGravityAlignedCameraInitialized = false;
 };

@@ -83,6 +83,8 @@ void ATinyverseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 
 		// Moving
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &ATinyverseCharacter::Move);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Completed, this, &ATinyverseCharacter::StopMove);
+		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Canceled, this, &ATinyverseCharacter::StopMove);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ATinyverseCharacter::Look);
 
 		// Looking
@@ -103,6 +105,17 @@ void ATinyverseCharacter::Move(const FInputActionValue& Value)
 	DoMove(MovementVector.X, MovementVector.Y);
 }
 
+void ATinyverseCharacter::StopMove(const FInputActionValue&)
+{
+	const bool bWasMovingBackward = ForwardMovementInput < -KINDA_SMALL_NUMBER;
+	ForwardMovementInput = 0.0f;
+
+	if (bWasMovingBackward)
+	{
+		TimeSinceLastCameraInput = 0.0f;
+	}
+}
+
 void ATinyverseCharacter::Look(const FInputActionValue& Value)
 {
 	// input is a Vector2D
@@ -114,6 +127,8 @@ void ATinyverseCharacter::Look(const FInputActionValue& Value)
 
 void ATinyverseCharacter::DoMove(float Right, float Forward)
 {
+	ForwardMovementInput = Forward;
+
 	if (GetController() == nullptr)
 	{
 		return;
@@ -265,8 +280,9 @@ void ATinyverseCharacter::UpdateAutomaticCamera(float DeltaSeconds, const FVecto
 	}
 
 	const FVector TangentVelocity = FVector::VectorPlaneProject(GetVelocity(), LocalUp);
+	const bool bAllowAutomaticYaw = ForwardMovementInput >= -KINDA_SMALL_NUMBER;
 
-	if (TangentVelocity.SizeSquared() >= FMath::Square(AutomaticCameraMinimumSpeed))
+	if (bAllowAutomaticYaw && TangentVelocity.SizeSquared() >= FMath::Square(AutomaticCameraMinimumSpeed))
 	{
 		const FVector DesiredForward = FVector::VectorPlaneProject(GetActorForwardVector(), LocalUp).GetSafeNormal();
 		const float ForwardDot = FMath::Clamp(
