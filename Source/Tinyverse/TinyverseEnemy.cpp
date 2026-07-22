@@ -1,13 +1,22 @@
 #include "TinyverseEnemy.h"
 #include "TinyverseCharacter.h"
+#include "TinyverseHealthComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SphereComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/DamageType.h"
+#include "Kismet/GameplayStatics.h"
+
 
 ATinyverseEnemy::ATinyverseEnemy()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
-
+	
+	EnemyHealthComponent =
+		CreateDefaultSubobject<UTinyverseHealthComponent>(
+			TEXT("HealthComponent"));
+	
 	StompTrigger = CreateDefaultSubobject<UCapsuleComponent>(TEXT("StompTrigger"));
 	StompTrigger->SetupAttachment(GetCapsuleComponent());
 	StompTrigger->SetAbsolute(false, false, false);
@@ -34,6 +43,22 @@ ATinyverseEnemy::ATinyverseEnemy()
 	StompTrigger->OnComponentBeginOverlap.AddDynamic(
 		this,
 		&ATinyverseEnemy::HandleStompTriggerBeginOverlap);
+
+	DamageTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("DamageTrigger"));
+	DamageTrigger->SetupAttachment(GetCapsuleComponent());
+	DamageTrigger->InitSphereRadius(36.0f);
+	DamageTrigger->SetAbsolute(false, false, false);
+	DamageTrigger->SetMobility(EComponentMobility::Movable);
+	DamageTrigger->SetCanEverAffectNavigation(false);
+	DamageTrigger->CanCharacterStepUpOn = ECB_No;
+	DamageTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	DamageTrigger->SetCollisionObjectType(ECollisionChannel::ECC_WorldDynamic);
+	DamageTrigger->SetCollisionResponseToAllChannels(ECollisionResponse::ECR_Ignore);
+	DamageTrigger->SetCollisionResponseToChannel(ECollisionChannel::ECC_Pawn, ECollisionResponse::ECR_Overlap);
+	DamageTrigger->SetGenerateOverlapEvents(true);
+	DamageTrigger->OnComponentBeginOverlap.AddDynamic(
+		this,
+		&ATinyverseEnemy::HandleDamageTriggerBeginOverlap);
 }
 
 void ATinyverseEnemy::HandleStompTriggerBeginOverlap(
@@ -45,12 +70,11 @@ void ATinyverseEnemy::HandleStompTriggerBeginOverlap(
 	const FHitResult& SweepResult)
 {
 	ATinyverseCharacter* PlayerCharacter = Cast<ATinyverseCharacter>(OtherActor);
-	if (!IsValid(PlayerCharacter) || bIsDefeated)
+	if (!IsValid(PlayerCharacter) || IsDefeated)
 	{
 		return;
 	}
 
-	bIsDefeated = true;
 	UCharacterMovementComponent* PlayerMovement = PlayerCharacter->GetCharacterMovement();
 
 	if (IsValid(PlayerMovement))
@@ -75,8 +99,13 @@ void ATinyverseEnemy::HandleStompTriggerBeginOverlap(
 			true,
 			true);
 	}
-
-	Destroy();
+	
+	UGameplayStatics::ApplyDamage(
+		this,
+		StompDamage,
+		PlayerCharacter->GetController(),
+		PlayerCharacter,
+		UDamageType::StaticClass());
 }
 
 
@@ -127,6 +156,13 @@ void ATinyverseEnemy::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (IsValid(EnemyHealthComponent))
+	{
+		EnemyHealthComponent->OnDeath.AddUniqueDynamic(
+			this,
+			&ATinyverseEnemy::HandleDeath);
+	}
+
 	UpdateGravity();
 
 	UCharacterMovementComponent* Movement = GetCharacterMovement();
@@ -160,7 +196,7 @@ void ATinyverseEnemy::BeginPlay()
 
 void ATinyverseEnemy::MoveAlongPlanet(float DeltaTime)
 {
-	if (bIsDefeated || DeltaTime <= 0.0f)
+	if (IsDefeated || DeltaTime <= 0.0f)
 	{
 		return;
 	}
@@ -246,4 +282,122 @@ void ATinyverseEnemy::ReversePatrolDirection()
 	}
 	
 	PatrolDirection *= -1.0f;
+}
+
+void ATinyverseEnemy::HandleDamageTriggerBeginOverlap(
+	UPrimitiveComponent* OverlappedComponent,
+	AActor* OtherActor,
+	UPrimitiveComponent* OtherComponent,
+	int32 OtherBodyIndex,
+	bool bFromSweep,
+	const FHitResult& SweepResult)
+{
+	if (IsDefeated || ContactDamage <= 0.0f)
+	{
+		return;
+	}
+
+	ATinyverseCharacter* PlayerCharacter = Cast<ATinyverseCharacter>(OtherActor);
+
+	if (!IsValid(PlayerCharacter))
+	{
+		return;
+	}
+
+	if (StompTrigger->IsOverlappingActor(PlayerCharacter))
+	{
+		return;
+	}
+
+	UTinyverseHealthComponent* PlayerHealthComponent =
+		PlayerCharacter->GetHealthComponent();
+	
+	const float PreviousHealth = IsValid(PlayerHealthComponent)
+		                             ? PlayerHealthComponent->GetCurrentHealth()
+		                             : 0.0f;
+
+	UGameplayStatics::ApplyDamage(
+		PlayerCharacter,
+		ContactDamage,
+		GetController(),
+		this,
+		UDamageType::StaticClass());
+
+	const bool bDamageWasApplied = IsValid(PlayerHealthComponent)
+		                               && PlayerHealthComponent->GetCurrentHealth() < PreviousHealth;
+
+	if (!bDamageWasApplied)
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* PlayerMovement = PlayerCharacter->GetCharacterMovement();
+	FVector LocalUp = IsValid(PlayerMovement)
+		                  ? -PlayerMovement->GetGravityDirection().GetSafeNormal()
+		                  : FVector::ZeroVector;
+
+	if (LocalUp.IsNearlyZero())
+	{
+		LocalUp = PlayerCharacter->GetActorUpVector().GetSafeNormal();
+	}
+
+	FVector AwayDirection = FVector::VectorPlaneProject(
+		PlayerCharacter->GetActorLocation() - GetActorLocation(),
+		LocalUp).GetSafeNormal();
+
+	if (AwayDirection.IsNearlyZero())
+	{
+		AwayDirection = FVector::VectorPlaneProject(
+			-GetActorForwardVector(),
+			LocalUp).GetSafeNormal();
+	}
+
+	const FVector KnockbackVelocity =
+		AwayDirection * ContactKnockbackSpeed
+		+ LocalUp * ContactKnockbackLiftSpeed;
+
+	PlayerCharacter->LaunchCharacter(KnockbackVelocity, true, true);
+
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("%s ha inflitto %.0f danni a %s (HP: %.0f)"),
+		*GetNameSafe(this),
+		PreviousHealth - PlayerHealthComponent->GetCurrentHealth(),
+		*GetNameSafe(PlayerCharacter),
+		PlayerHealthComponent->GetCurrentHealth());
+}
+
+void ATinyverseEnemy::HandleDeath(
+	UTinyverseHealthComponent* DeadHealthComponent,
+	AActor* DamageCauser)
+{
+	if (IsDefeated || DeadHealthComponent != EnemyHealthComponent)
+	{
+		return;
+	}
+	
+	IsDefeated = true;
+	
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("%s sconfitto da %s"),
+		*GetNameSafe(this),
+		*GetNameSafe(DamageCauser));
+
+	Destroy();
+}
+
+
+void ATinyverseEnemy::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (IsValid(EnemyHealthComponent))
+	{
+		EnemyHealthComponent->OnDeath.RemoveDynamic(
+			this,
+			&ATinyverseEnemy::HandleDeath);
+	}
+	
+	Super::EndPlay(EndPlayReason);
 }

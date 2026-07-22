@@ -7,8 +7,10 @@
 #include "TinyverseEnemy.generated.h"
 
 class UCapsuleComponent;
+class USphereComponent;
 class UPrimitiveComponent;
 struct FHitResult;
+class UTinyverseHealthComponent;
 
 UCLASS(Abstract, Blueprintable)
 class TINYVERSE_API ATinyverseEnemy : public ACharacter
@@ -29,15 +31,20 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
 	UCapsuleComponent* StompTrigger = nullptr;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
+	USphereComponent* DamageTrigger = nullptr;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
+	UTinyverseHealthComponent* EnemyHealthComponent = nullptr;
+	
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="State")
-	bool bIsDefeated = false;
+	bool IsDefeated = false;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stomp", meta=(ClampMin="0.0"))
 	float StompBounceSpeed = 600.0f;
 	
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Gravity")
 	TObjectPtr<AActor> GravityPlanet = nullptr;
-	
 		
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI|Patrol", meta=(ClampMin="0.0"))
 	float PatrolSpeed=150.0f;
@@ -46,9 +53,22 @@ protected:
 	float PatrolTurnSpeed = 6.0f;
 	
 	FVector PatrolDirection = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Damage", meta=(ClampMin="0.0"))
+	float ContactDamage = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Stomp", meta=(ClampMin="0.0"))
+	float StompDamage = 1.0f;
 	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Knockback", meta=(ClampMin="0.0"))
+	float ContactKnockbackSpeed = 450.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Knockback", meta=(ClampMin="0.0"))
+	float ContactKnockbackLiftSpeed = 250.0f;
+
 	void BeginPlay() override;
 	void Tick(float DeltaTime) override;
+	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 	void UpdateGravity();
 	
@@ -56,6 +76,20 @@ protected:
 	void HandleStompTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OverlappedActor,
 	                                    UPrimitiveComponent* OtherComponent, int32 OtherBodyIndex,
 	                                    bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void HandleDamageTriggerBeginOverlap(
+		UPrimitiveComponent* OverlappedComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult);
+	
+	UFUNCTION()
+	void HandleDeath(
+		UTinyverseHealthComponent* DeadHealthComponent,
+		AActor* DamageCauser);
 };
 
 

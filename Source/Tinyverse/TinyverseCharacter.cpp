@@ -6,16 +6,20 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "GameFramework/Controller.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Tinyverse.h"
+#include "TinyverseHealthComponent.h"
 
 ATinyverseCharacter::ATinyverseCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
+	
+	HealthComponent =
+		CreateDefaultSubobject<UTinyverseHealthComponent>(
+			TEXT("HealthComponent"));
+	
 	// Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
