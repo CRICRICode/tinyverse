@@ -6,8 +6,7 @@
 #include "GameFramework/Character.h"
 #include "TinyverseEnemy.generated.h"
 
-class UBoxComponent;
-class USceneComponent;
+class UCapsuleComponent;
 class UPrimitiveComponent;
 struct FHitResult;
 
@@ -18,10 +17,17 @@ class TINYVERSE_API ATinyverseEnemy : public ACharacter
 	
 public:	
 	ATinyverseEnemy();
+	
+	UFUNCTION(BlueprintCallable, Category="AI|Patrol")
+	void MoveAlongPlanet(float DeltaTime);
+	
+	UFUNCTION(BlueprintCallable, Category="AI|Patrol")
+	void ReversePatrolDirection();
+	
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
-	UBoxComponent* StompTrigger = nullptr;
+	UCapsuleComponent* StompTrigger = nullptr;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="State")
 	bool bIsDefeated = false;
@@ -32,7 +38,17 @@ protected:
 	UPROPERTY(EditInstanceOnly, BlueprintReadOnly, Category="Gravity")
 	TObjectPtr<AActor> GravityPlanet = nullptr;
 	
-	virtual void Tick(float DeltaTime) override;
+		
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI|Patrol", meta=(ClampMin="0.0"))
+	float PatrolSpeed=150.0f;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI|Patrol", meta=(ClampMin="0.1"))
+	float PatrolTurnSpeed = 6.0f;
+	
+	FVector PatrolDirection = FVector::ZeroVector;
+	
+	void BeginPlay() override;
+	void Tick(float DeltaTime) override;
 	
 	void UpdateGravity();
 	
