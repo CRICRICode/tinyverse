@@ -12,6 +12,15 @@ class UPrimitiveComponent;
 struct FHitResult;
 class UTinyverseHealthComponent;
 
+UENUM(BlueprintType)
+enum class ETinyverseEnemyChargePhase : uint8
+{
+	Inactive,
+	Windup,
+	Charging,
+	Recovery
+};
+
 UCLASS(Abstract, Blueprintable)
 class TINYVERSE_API ATinyverseEnemy : public ACharacter
 {
@@ -26,6 +35,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category="AI|Patrol")
 	void ReversePatrolDirection();
 	
+	UFUNCTION(BlueprintCallable, Category="AI|Charge", meta=(ReturnDisplayName = "Started"))
+	bool StartCharge(AActor* TargetActor);
+	
+	UFUNCTION(BlueprintCallable, Category="AI|Charge", meta=(ReturnDisplayName="Finished"))
+	bool UpdateCharge(float DeltaTime);
+
+	UFUNCTION(BlueprintCallable, Category="AI|Charge")
+	void CancelCharge();
+
+	UFUNCTION(BlueprintPure, Category="AI|Charge")
+	float GetDetectionRadius() const;
+
+	UFUNCTION(BlueprintPure, Category="AI|Charge")
+	float GetLoseTargetRadius() const;
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
@@ -38,7 +61,7 @@ protected:
 	UTinyverseHealthComponent* EnemyHealthComponent = nullptr;
 	
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="State")
-	bool IsDefeated = false;
+	bool bIsDefeated = false;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stomp", meta=(ClampMin="0.0"))
 	float StompBounceSpeed = 600.0f;
@@ -51,6 +74,27 @@ protected:
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI|Patrol", meta=(ClampMin="0.1"))
 	float PatrolTurnSpeed = 6.0f;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	float DetectionRadius = 800.0f;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	float LoseTargetRadius = 1000.0f;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	float ChargeWindupDuration = 0.35f;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	float ChargeSpeed = 500.0f;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	float ChargeDuration = 0.8f;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	float ChargeRecoveryDuration = 0.6f;
+	
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	float ChargeDamage = 1.0f;
 	
 	FVector PatrolDirection = FVector::ZeroVector;
 
@@ -66,11 +110,25 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Combat|Knockback", meta=(ClampMin="0.0"))
 	float ContactKnockbackLiftSpeed = 250.0f;
 
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="AI|Charge")
+	ETinyverseEnemyChargePhase ChargePhase = ETinyverseEnemyChargePhase::Inactive;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> ChargeTarget = nullptr;
+	
+	float ChargePhaseElapsedTime = 0.0f;
+	FVector ChargeDirection = FVector::ZeroVector;
+	
 	void BeginPlay() override;
 	void Tick(float DeltaTime) override;
 	void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	
 	void UpdateGravity();
+	FVector GetLocalUp() const;
+	FVector GetTangentDirectionTo(const AActor* TargetActor) const;
+	void EnterChargePhase(ETinyverseEnemyChargePhase NewPhase);
+	void UpdateChargeFacing(float DeltaTime);
+	void UpdateChargeMovement();
 	
 	UFUNCTION()
 	void HandleStompTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OverlappedActor,

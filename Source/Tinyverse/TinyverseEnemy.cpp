@@ -70,7 +70,7 @@ void ATinyverseEnemy::HandleStompTriggerBeginOverlap(
 	const FHitResult& SweepResult)
 {
 	ATinyverseCharacter* PlayerCharacter = Cast<ATinyverseCharacter>(OtherActor);
-	if (!IsValid(PlayerCharacter) || IsDefeated)
+	if (!IsValid(PlayerCharacter) || bIsDefeated)
 	{
 		return;
 	}
@@ -98,6 +98,12 @@ void ATinyverseEnemy::HandleStompTriggerBeginOverlap(
 			BounceVelocity,
 			true,
 			true);
+	}
+	
+	if (ChargePhase != ETinyverseEnemyChargePhase::Inactive)
+	{
+		EnterChargePhase(
+			ETinyverseEnemyChargePhase::Recovery);
 	}
 	
 	UGameplayStatics::ApplyDamage(
@@ -196,7 +202,9 @@ void ATinyverseEnemy::BeginPlay()
 
 void ATinyverseEnemy::MoveAlongPlanet(float DeltaTime)
 {
-	if (IsDefeated || DeltaTime <= 0.0f)
+	if (bIsDefeated 
+		|| DeltaTime <= 0.0f
+		|| ChargePhase != ETinyverseEnemyChargePhase::Inactive)
 	{
 		return;
 	}
@@ -292,7 +300,7 @@ void ATinyverseEnemy::HandleDamageTriggerBeginOverlap(
 	bool bFromSweep,
 	const FHitResult& SweepResult)
 {
-	if (IsDefeated || ContactDamage <= 0.0f)
+	if (bIsDefeated)
 	{
 		return;
 	}
@@ -308,6 +316,16 @@ void ATinyverseEnemy::HandleDamageTriggerBeginOverlap(
 	{
 		return;
 	}
+	
+	const float DamageAmount =
+	ChargePhase == ETinyverseEnemyChargePhase::Charging
+		? ChargeDamage
+		: ContactDamage;
+
+	if (bIsDefeated || DamageAmount <= 0.0f)
+	{
+		return;
+	}
 
 	UTinyverseHealthComponent* PlayerHealthComponent =
 		PlayerCharacter->GetHealthComponent();
@@ -316,9 +334,15 @@ void ATinyverseEnemy::HandleDamageTriggerBeginOverlap(
 		                             ? PlayerHealthComponent->GetCurrentHealth()
 		                             : 0.0f;
 
+	if (ChargePhase != ETinyverseEnemyChargePhase::Inactive)
+	{
+		EnterChargePhase(
+			ETinyverseEnemyChargePhase::Recovery);
+	}
+	
 	UGameplayStatics::ApplyDamage(
 		PlayerCharacter,
-		ContactDamage,
+		DamageAmount,
 		GetController(),
 		this,
 		UDamageType::StaticClass());
@@ -372,12 +396,13 @@ void ATinyverseEnemy::HandleDeath(
 	UTinyverseHealthComponent* DeadHealthComponent,
 	AActor* DamageCauser)
 {
-	if (IsDefeated || DeadHealthComponent != EnemyHealthComponent)
+	if (bIsDefeated || DeadHealthComponent != EnemyHealthComponent)
 	{
 		return;
 	}
 	
-	IsDefeated = true;
+	CancelCharge();
+	bIsDefeated = true;
 	
 	UE_LOG(
 		LogTemp,
@@ -389,6 +414,271 @@ void ATinyverseEnemy::HandleDeath(
 	Destroy();
 }
 
+
+float ATinyverseEnemy::GetDetectionRadius() const
+{
+	return FMath::Max(0.0f,DetectionRadius);
+}
+
+float ATinyverseEnemy::GetLoseTargetRadius() const
+{
+	return FMath::Max(GetDetectionRadius(),LoseTargetRadius);
+}
+
+FVector ATinyverseEnemy::GetLocalUp() const
+{
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	
+	if (IsValid(Movement))
+	{
+		const FVector GravityDirection = Movement->GetGravityDirection().GetSafeNormal();
+		
+		if (!GravityDirection.IsNearlyZero())
+		{
+			return -GravityDirection;
+		}
+	}
+	
+	return GetActorUpVector().GetSafeNormal();
+}
+
+FVector ATinyverseEnemy::GetTangentDirectionTo(const AActor* TargetActor) const
+{
+	if (!IsValid(TargetActor))
+	{
+		return FVector::ZeroVector;
+	}
+	
+	return FVector::VectorPlaneProject(
+		TargetActor->GetActorLocation() - GetActorLocation(),
+		GetLocalUp()).GetSafeNormal();
+}
+
+bool ATinyverseEnemy::StartCharge(AActor* TargetActor)
+{
+	const FVector InitialDirection =
+	GetTangentDirectionTo(TargetActor);
+	
+	if (!IsValid(TargetActor) ||
+		TargetActor == this
+		|| bIsDefeated
+		|| ChargePhase != ETinyverseEnemyChargePhase::Inactive
+		|| InitialDirection.IsNearlyZero())
+	{
+		return false;
+	}
+	
+	ChargeTarget = TargetActor;
+	ChargeDirection = InitialDirection;
+	
+	EnterChargePhase(ETinyverseEnemyChargePhase::Windup);
+	
+	return true;
+}
+
+void ATinyverseEnemy::EnterChargePhase(ETinyverseEnemyChargePhase NewPhase)
+{
+	ChargePhase = NewPhase;
+	ChargePhaseElapsedTime = 0.0f;
+	
+	if (ChargePhase == ETinyverseEnemyChargePhase::Inactive)
+	{
+		ChargeTarget = nullptr;
+		ChargeDirection = FVector::ZeroVector;
+	}
+	else if (ChargePhase == ETinyverseEnemyChargePhase::Charging)
+	{
+		ChargeDirection = FVector::VectorPlaneProject(
+			GetActorForwardVector(),
+			GetLocalUp()).GetSafeNormal();
+		
+		if (ChargeDirection.IsNearlyZero())
+		{
+			ChargeDirection = GetTangentDirectionTo(ChargeTarget);
+		}
+	}
+	
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	
+	if (!IsValid(Movement))
+	{
+		return;
+	}
+	
+	switch (ChargePhase)
+	{
+	case ETinyverseEnemyChargePhase::Inactive:
+		Movement->StopMovementImmediately();
+		Movement->MaxWalkSpeed = PatrolSpeed;
+		break;
+
+	case ETinyverseEnemyChargePhase::Windup:
+		Movement->StopMovementImmediately();
+		Movement->MaxWalkSpeed = 0.0f;
+		break;
+
+	case ETinyverseEnemyChargePhase::Charging:
+		Movement->MaxWalkSpeed = ChargeSpeed;
+		break;
+
+	case ETinyverseEnemyChargePhase::Recovery:
+		Movement->StopMovementImmediately();
+		Movement->MaxWalkSpeed = 0.0f;
+		break;
+	}
+}
+
+void ATinyverseEnemy::UpdateChargeFacing(float DeltaTime)
+{
+	if (DeltaTime <= 0.0f || !IsValid(ChargeTarget))
+	{
+		return;
+	}
+	
+	const FVector LocalUp = GetLocalUp();
+	const FVector DesiredForward = GetTangentDirectionTo(ChargeTarget);
+	
+	FVector CurrentForward = 
+		FVector::VectorPlaneProject(
+			GetActorForwardVector(),
+			LocalUp).GetSafeNormal();
+	
+	if (CurrentForward.IsNearlyZero() || DesiredForward.IsNearlyZero())
+	{
+		return;
+	}
+	
+	const float ForwardDot = FMath::Clamp(
+		FVector::DotProduct(CurrentForward, DesiredForward),
+		-1.0f,
+		1.0f);
+	
+	const float SignedAngle = FMath::Atan2(
+		FVector::DotProduct(
+			FVector::CrossProduct(CurrentForward, DesiredForward),
+			LocalUp),
+		ForwardDot);
+
+	
+	const float MaxTurnStep =
+		ChargeWindupDuration <= KINDA_SMALL_NUMBER
+			? FMath::Abs(SignedAngle)
+			: PI*DeltaTime/ChargeWindupDuration;
+
+	const float TurnStep = FMath::Clamp(
+		SignedAngle,
+		-MaxTurnStep,
+		MaxTurnStep);
+
+	const FVector NewForward = FQuat(LocalUp, TurnStep)
+		.RotateVector(CurrentForward).GetSafeNormal();
+	
+	SetActorRotation(
+		FRotationMatrix::MakeFromXZ(
+			NewForward,
+			LocalUp).ToQuat());
+	
+	ChargeDirection = DesiredForward;
+	
+}
+
+void ATinyverseEnemy::UpdateChargeMovement()
+{
+	const FVector LocalUp = GetLocalUp();
+
+	ChargeDirection = FVector::VectorPlaneProject(
+		ChargeDirection,
+		LocalUp).GetSafeNormal();
+
+	if (ChargeDirection.IsNearlyZero())
+	{
+		return;
+	}
+
+	AddMovementInput(ChargeDirection, 1.0f);
+
+	SetActorRotation(
+		FRotationMatrix::MakeFromXZ(
+			ChargeDirection,
+			LocalUp).ToQuat());
+}
+
+bool ATinyverseEnemy::UpdateCharge(float DeltaTime)
+{
+	if (ChargePhase == ETinyverseEnemyChargePhase::Inactive)
+	{
+		return true;
+	}
+
+	if (bIsDefeated)
+	{
+		CancelCharge();
+		return true;
+	}
+
+	if (DeltaTime <= 0.0f)
+	{
+		return false;
+	}
+
+	ChargePhaseElapsedTime += DeltaTime;
+
+	switch (ChargePhase)
+	{
+	case ETinyverseEnemyChargePhase::Windup:
+		if (!IsValid(ChargeTarget))
+		{
+			CancelCharge();
+			return true;
+		}
+
+		UpdateChargeFacing(DeltaTime);
+
+		if (ChargePhaseElapsedTime >=
+			FMath::Max(0.0f, ChargeWindupDuration))
+		{
+			EnterChargePhase(
+				ETinyverseEnemyChargePhase::Charging);
+		}
+		break;
+
+	case ETinyverseEnemyChargePhase::Charging:
+		UpdateChargeMovement();
+
+		if (ChargePhaseElapsedTime >=
+			FMath::Max(0.0f, ChargeDuration))
+		{
+			EnterChargePhase(
+				ETinyverseEnemyChargePhase::Recovery);
+		}
+		break;
+
+	case ETinyverseEnemyChargePhase::Recovery:
+		if (ChargePhaseElapsedTime >=
+			FMath::Max(0.0f, ChargeRecoveryDuration))
+		{
+			CancelCharge();
+			return true;
+		}
+		break;
+
+	case ETinyverseEnemyChargePhase::Inactive:
+		return true;
+	}
+
+	return false;
+}
+
+void ATinyverseEnemy::CancelCharge()
+{
+	if (ChargePhase == ETinyverseEnemyChargePhase::Inactive)
+	{
+		return;
+	}
+
+	EnterChargePhase(
+		ETinyverseEnemyChargePhase::Inactive);
+}
 
 void ATinyverseEnemy::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
