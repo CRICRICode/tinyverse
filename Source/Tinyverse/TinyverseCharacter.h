@@ -10,6 +10,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class ATinyverseGravityPlanet;
 struct FInputActionValue;
 class UTinyverseHealthComponent;
 
@@ -60,7 +61,13 @@ protected:
 public:
 
 	/** Constructor */
-	ATinyverseCharacter();	
+	ATinyverseCharacter();
+
+	void RegisterGravityPlanet(ATinyverseGravityPlanet* GravityPlanet);
+	void UnregisterGravityPlanet(ATinyverseGravityPlanet* GravityPlanet);
+
+	UFUNCTION(BlueprintPure, Category="Movement|Planet|Gravity")
+	ATinyverseGravityPlanet* GetActiveGravityPlanet() const;
 
 protected:
 
@@ -110,6 +117,7 @@ public:
 
 	FORCEINLINE class UTinyverseHealthComponent* GetHealthComponent() const { return HealthComponent; }
 private:
+	void UpdatePlanetGravity(float DeltaSeconds);
 
 	FVector GetLocalUp() const;
 
@@ -125,6 +133,30 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
 	float CharacterTurnSpeed = 12.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true"))
+	bool bEnablePlanetGravity = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ClampMin="1.0"))
+	float GravitySwitchRatio = 1.15f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
+	float GravitySurfaceCaptureDistance = 250.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="deg/s"))
+	float GravityDirectionRotationSpeed = 540.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true"))
+	bool bLockGravitySourceWhileGrounded = true;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<ATinyverseGravityPlanet> ActiveGravityPlanet;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true"))
+	float CurrentGravityStrength = 0.0f;
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<ATinyverseGravityPlanet>> NearbyGravityPlanets;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Camera|Planet", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
 	float CameraYawSensitivity = 1.0f;
@@ -181,5 +213,7 @@ private:
 	float ForwardMovementInput = 0.0f;
 
 	bool bGravityAlignedCameraInitialized = false;
+
+	bool bHasPlanetGravityDirection = false;
 };
 

@@ -4,12 +4,16 @@
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "DrawDebugHelpers.h"
+#include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
+#include "EngineUtils.h"
 #include "InputActionValue.h"
 #include "Tinyverse.h"
+#include "TinyverseGravityPlanet.h"
 #include "TinyverseHealthComponent.h"
 
 ATinyverseCharacter::ATinyverseCharacter()
@@ -62,6 +66,19 @@ void ATinyverseCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	if (bEnablePlanetGravity)
+	{
+		for (TActorIterator<ATinyverseGravityPlanet> PlanetIterator(GetWorld()); PlanetIterator; ++PlanetIterator)
+		{
+			if (PlanetIterator->IsLocationWithinInfluence(GetActorLocation()))
+			{
+				RegisterGravityPlanet(*PlanetIterator);
+			}
+		}
+
+		UpdatePlanetGravity(0.0f);
+	}
+
 	InitializeGravityAlignedCamera();
 }
 
@@ -69,11 +86,207 @@ void ATinyverseCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
+	UpdatePlanetGravity(DeltaSeconds);
+
 	const FVector LocalUp = GetLocalUp();
 	AlignCameraFrameToUp(LocalUp);
 	UpdateCharacterFacing(DeltaSeconds, LocalUp);
 	UpdateAutomaticCamera(DeltaSeconds, LocalUp);
 	ApplyGravityAlignedCamera();
+}
+
+void ATinyverseCharacter::RegisterGravityPlanet(
+	ATinyverseGravityPlanet* GravityPlanet)
+{
+	if (IsValid(GravityPlanet))
+	{
+		NearbyGravityPlanets.AddUnique(GravityPlanet);
+	}
+}
+
+void ATinyverseCharacter::UnregisterGravityPlanet(
+	ATinyverseGravityPlanet* GravityPlanet)
+{
+	NearbyGravityPlanets.RemoveSingleSwap(GravityPlanet);
+
+	if (ActiveGravityPlanet == GravityPlanet)
+	{
+		ActiveGravityPlanet = nullptr;
+	}
+}
+
+ATinyverseGravityPlanet* ATinyverseCharacter::GetActiveGravityPlanet() const
+{
+	return ActiveGravityPlanet;
+}
+
+void ATinyverseCharacter::UpdatePlanetGravity(float DeltaSeconds)
+{
+	if (!bEnablePlanetGravity)
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+
+	if (!IsValid(Movement))
+	{
+		return;
+	}
+
+	const FVector CharacterLocation = GetActorLocation();
+
+	NearbyGravityPlanets.RemoveAllSwap(
+		[CharacterLocation](const TObjectPtr<ATinyverseGravityPlanet>& Planet)
+		{
+			return !IsValid(Planet)
+				|| !Planet->IsLocationWithinInfluence(CharacterLocation);
+		});
+
+	ATinyverseGravityPlanet* StrongestPlanet = nullptr;
+	float StrongestGravity = 0.0f;
+	float ActivePriority = 0.0f;
+	bool bActivePlanetIsCandidate = false;
+	ATinyverseGravityPlanet* ClosestSurfacePlanet = nullptr;
+	float ClosestSurfaceDistance = TNumericLimits<float>::Max();
+
+	for (ATinyverseGravityPlanet* Planet : NearbyGravityPlanets)
+	{
+		if (!IsValid(Planet))
+		{
+			continue;
+		}
+
+		const float GravityPriority =
+			Planet->GetGravityPriorityAtLocation(CharacterLocation);
+		const float DistanceFromSurface = FMath::Max(
+			0.0f,
+			FVector::Distance(Planet->GetActorLocation(), CharacterLocation)
+			- Planet->GetPlanetRadius());
+
+		if (DistanceFromSurface <= GravitySurfaceCaptureDistance
+			&& DistanceFromSurface < ClosestSurfaceDistance)
+		{
+			ClosestSurfaceDistance = DistanceFromSurface;
+			ClosestSurfacePlanet = Planet;
+		}
+
+		if (Planet == ActiveGravityPlanet)
+		{
+			ActivePriority = GravityPriority;
+			bActivePlanetIsCandidate = GravityPriority > 0.0f;
+		}
+
+		if (GravityPriority > StrongestGravity)
+		{
+			StrongestGravity = GravityPriority;
+			StrongestPlanet = Planet;
+		}
+	}
+
+	ATinyverseGravityPlanet* GroundPlanet = nullptr;
+
+	if (Movement->IsMovingOnGround())
+	{
+		GroundPlanet = Cast<ATinyverseGravityPlanet>(
+			Movement->CurrentFloor.HitResult.GetActor());
+	}
+
+	if (IsValid(ClosestSurfacePlanet))
+	{
+		ActiveGravityPlanet = ClosestSurfacePlanet;
+		bActivePlanetIsCandidate = true;
+	}
+	else if (IsValid(GroundPlanet)
+		&& GroundPlanet->IsLocationWithinInfluence(CharacterLocation))
+	{
+		NearbyGravityPlanets.AddUnique(GroundPlanet);
+		ActiveGravityPlanet = GroundPlanet;
+		bActivePlanetIsCandidate = true;
+	}
+
+	const bool bKeepGroundedSource = bLockGravitySourceWhileGrounded
+		&& Movement->IsMovingOnGround()
+		&& !IsValid(GroundPlanet)
+		&& bActivePlanetIsCandidate;
+
+	if (!IsValid(ClosestSurfacePlanet)
+		&& !IsValid(GroundPlanet)
+		&& !bActivePlanetIsCandidate)
+	{
+		ActiveGravityPlanet = StrongestPlanet;
+	}
+	else if (!IsValid(ClosestSurfacePlanet)
+		&& !IsValid(GroundPlanet)
+		&& !bKeepGroundedSource
+		&& StrongestPlanet != ActiveGravityPlanet
+		&& StrongestGravity > ActivePriority * FMath::Max(1.0f, GravitySwitchRatio))
+	{
+		ActiveGravityPlanet = StrongestPlanet;
+	}
+
+	if (!IsValid(ActiveGravityPlanet))
+	{
+		CurrentGravityStrength = 0.0f;
+		Movement->GravityScale = 0.0f;
+		return;
+	}
+
+	CurrentGravityStrength =
+		ActiveGravityPlanet->GetGravityStrengthAtLocation(CharacterLocation);
+
+	const FVector DesiredGravityDirection =
+		ActiveGravityPlanet->GetGravityDirectionAtLocation(CharacterLocation);
+
+	if (DesiredGravityDirection.IsNearlyZero())
+	{
+		Movement->GravityScale = 0.0f;
+		return;
+	}
+
+	FVector NewGravityDirection = DesiredGravityDirection;
+
+	if (bHasPlanetGravityDirection
+		&& DeltaSeconds > 0.0f
+		&& GravityDirectionRotationSpeed > 0.0f)
+	{
+		NewGravityDirection = FMath::VInterpNormalRotationTo(
+			Movement->GetGravityDirection().GetSafeNormal(),
+			DesiredGravityDirection,
+			DeltaSeconds,
+			GravityDirectionRotationSpeed);
+	}
+
+	Movement->SetGravityDirection(NewGravityDirection);
+	bHasPlanetGravityDirection = true;
+
+	const UWorld* World = GetWorld();
+	const float BaseGravity = IsValid(World)
+		                          ? FMath::Abs(World->GetGravityZ())
+		                          : 0.0f;
+
+	Movement->GravityScale = BaseGravity > KINDA_SMALL_NUMBER
+		                         ? CurrentGravityStrength / BaseGravity
+		                         : 0.0f;
+
+#if !UE_BUILD_SHIPPING
+	if (bShowGravityDebug)
+	{
+		const FVector ArrowStart = CharacterLocation;
+		const FVector ArrowEnd = ArrowStart + NewGravityDirection * 180.0f;
+
+		DrawDebugDirectionalArrow(
+			GetWorld(),
+			ArrowStart,
+			ArrowEnd,
+			40.0f,
+			FColor::Red,
+			false,
+			0.0f,
+			0,
+			3.0f);
+	}
+#endif
 }
 
 void ATinyverseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
