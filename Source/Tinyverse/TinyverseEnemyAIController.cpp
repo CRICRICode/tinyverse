@@ -40,9 +40,11 @@ void ATinyverseEnemyAIController::OnPossess(APawn* InPawn)
 		return;
 	}
 
+#if !UE_BUILD_SHIPPING
 	UE_LOG(
 		LogTemp,
 		Display,
 		TEXT("Behavior Tree avviato per %s"),
 		*GetNameSafe(Enemy));
+#endif
 }

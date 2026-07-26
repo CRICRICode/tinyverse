@@ -105,6 +105,20 @@ void ATinyverseEnemy::HandleStompTriggerBeginOverlap(
 		EnterChargePhase(
 			ETinyverseEnemyChargePhase::Recovery);
 	}
+
+#if !UE_BUILD_SHIPPING
+	const FString EnemyName = GetNameSafe(this);
+	const FString PlayerName = GetNameSafe(PlayerCharacter);
+	const float PreviousHealth = IsValid(EnemyHealthComponent)
+		                             ? EnemyHealthComponent->GetCurrentHealth()
+		                             : 0.0f;
+	const float MaxHealth = IsValid(EnemyHealthComponent)
+		                        ? EnemyHealthComponent->GetMaxHealth()
+		                        : 0.0f;
+	const bool bWasInvulnerable = IsValid(EnemyHealthComponent)
+		                              && EnemyHealthComponent->IsInvulnerable();
+	const bool bCouldBeDamaged = CanBeDamaged();
+#endif
 	
 	UGameplayStatics::ApplyDamage(
 		this,
@@ -112,6 +126,29 @@ void ATinyverseEnemy::HandleStompTriggerBeginOverlap(
 		PlayerCharacter->GetController(),
 		PlayerCharacter,
 		UDamageType::StaticClass());
+
+#if !UE_BUILD_SHIPPING
+	const float CurrentHealth = EnemyHealthComponent != nullptr
+		                            ? EnemyHealthComponent->GetCurrentHealth()
+		                            : PreviousHealth;
+	const float AppliedDamage = PreviousHealth - CurrentHealth;
+
+	UE_LOG(
+		LogTemp,
+		Display,
+		TEXT("[STOMP] %s su %s | %s | richiesto: %.1f, applicato: %.1f, HP: %.1f/%.1f -> %.1f/%.1f, CanBeDamaged: %s, InvulnerableBefore: %s"),
+		*PlayerName,
+		*EnemyName,
+		AppliedDamage > 0.0f ? TEXT("VALIDO") : TEXT("IGNORATO"),
+		StompDamage,
+		AppliedDamage,
+		PreviousHealth,
+		MaxHealth,
+		CurrentHealth,
+		MaxHealth,
+		bCouldBeDamaged ? TEXT("true") : TEXT("false"),
+		bWasInvulnerable ? TEXT("true") : TEXT("false"));
+#endif
 }
 
 
@@ -382,6 +419,7 @@ void ATinyverseEnemy::HandleDamageTriggerBeginOverlap(
 
 	PlayerCharacter->LaunchCharacter(KnockbackVelocity, true, true);
 
+#if !UE_BUILD_SHIPPING
 	UE_LOG(
 		LogTemp,
 		Display,
@@ -390,6 +428,7 @@ void ATinyverseEnemy::HandleDamageTriggerBeginOverlap(
 		PreviousHealth - PlayerHealthComponent->GetCurrentHealth(),
 		*GetNameSafe(PlayerCharacter),
 		PlayerHealthComponent->GetCurrentHealth());
+#endif
 }
 
 void ATinyverseEnemy::HandleDeath(
@@ -404,12 +443,14 @@ void ATinyverseEnemy::HandleDeath(
 	CancelCharge();
 	bIsDefeated = true;
 	
+#if !UE_BUILD_SHIPPING
 	UE_LOG(
 		LogTemp,
 		Display,
 		TEXT("%s sconfitto da %s"),
 		*GetNameSafe(this),
 		*GetNameSafe(DamageCauser));
+#endif
 
 	Destroy();
 }
@@ -417,12 +458,106 @@ void ATinyverseEnemy::HandleDeath(
 
 float ATinyverseEnemy::GetDetectionRadius() const
 {
-	return FMath::Max(0.0f,DetectionRadius);
+	return FMath::Max(0.0f, DetectionRadius);
 }
 
 float ATinyverseEnemy::GetLoseTargetRadius() const
 {
-	return FMath::Max(GetDetectionRadius(),LoseTargetRadius);
+	return FMath::Max(GetDetectionRadius(), LoseTargetRadius);
+}
+
+float ATinyverseEnemy::GetChargeActivationRadius() const
+{
+	return FMath::Clamp(
+		ChargeActivationRadius,
+		0.0f,
+		GetDetectionRadius());
+}
+
+bool ATinyverseEnemy::TrackTargetAlongPlanet(
+	AActor* TargetActor,
+	float DeltaTime)
+{
+	if (!IsValid(TargetActor)
+		|| TargetActor == this
+		|| bIsDefeated
+		|| DeltaTime <= 0.0f
+		|| ChargePhase != ETinyverseEnemyChargePhase::Inactive)
+	{
+		return false;
+	}
+
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+
+	if (!IsValid(Movement))
+	{
+		return false;
+	}
+
+	const FVector LocalUp = GetLocalUp();
+	const FVector DesiredDirection = GetTangentDirectionTo(TargetActor);
+
+	if (LocalUp.IsNearlyZero() || DesiredDirection.IsNearlyZero())
+	{
+		return false;
+	}
+
+	Movement->MaxWalkSpeed = FMath::Max(0.0f, TrackingSpeed);
+	AddMovementInput(DesiredDirection, 1.0f);
+
+	FVector CurrentForward = FVector::VectorPlaneProject(
+		GetActorForwardVector(),
+		LocalUp).GetSafeNormal();
+
+	if (CurrentForward.IsNearlyZero())
+	{
+		CurrentForward = DesiredDirection;
+	}
+
+	const float ForwardDot = FMath::Clamp(
+		FVector::DotProduct(CurrentForward, DesiredDirection),
+		-1.0f,
+		1.0f);
+
+	const float SignedAngle = FMath::Atan2(
+		FVector::DotProduct(
+			FVector::CrossProduct(CurrentForward, DesiredDirection),
+			LocalUp),
+		ForwardDot);
+
+	const float TurnAlpha = 1.0f - FMath::Exp(
+		-FMath::Max(0.1f, TrackingTurnSpeed) * DeltaTime);
+
+	const FVector SmoothedForward = FQuat(
+		LocalUp,
+		SignedAngle * TurnAlpha)
+		.RotateVector(CurrentForward)
+		.GetSafeNormal();
+
+	SetActorRotation(
+		FRotationMatrix::MakeFromXZ(
+			SmoothedForward,
+			LocalUp).ToQuat());
+
+	return true;
+}
+
+void ATinyverseEnemy::StopTracking()
+{
+	if (ChargePhase != ETinyverseEnemyChargePhase::Inactive)
+	{
+		return;
+	}
+
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+
+	if (!IsValid(Movement))
+	{
+		return;
+	}
+
+	Movement->StopMovementImmediately();
+	Movement->MaxWalkSpeed = PatrolSpeed;
 }
 
 FVector ATinyverseEnemy::GetLocalUp() const

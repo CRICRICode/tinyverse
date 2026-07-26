@@ -44,11 +44,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category="AI|Charge")
 	void CancelCharge();
 
-	UFUNCTION(BlueprintPure, Category="AI|Charge")
+	UFUNCTION(BlueprintPure, Category="AI|Tracking")
 	float GetDetectionRadius() const;
 
-	UFUNCTION(BlueprintPure, Category="AI|Charge")
+	UFUNCTION(BlueprintPure, Category="AI|Tracking")
 	float GetLoseTargetRadius() const;
+
+	UFUNCTION(BlueprintPure, Category="AI|Tracking")
+	float GetChargeActivationRadius() const;
+
+	UFUNCTION(BlueprintCallable, Category="AI|Tracking", meta=(ReturnDisplayName="Tracking"))
+	bool TrackTargetAlongPlanet(AActor* TargetActor, float DeltaTime);
+
+	UFUNCTION(BlueprintCallable, Category="AI|Tracking")
+	void StopTracking();
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
@@ -75,11 +84,20 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI|Patrol", meta=(ClampMin="0.1"))
 	float PatrolTurnSpeed = 6.0f;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Tracking", meta=(ClampMin="0.0"))
 	float DetectionRadius = 800.0f;
 	
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Tracking", meta=(ClampMin="0.0"))
 	float LoseTargetRadius = 1000.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Tracking", meta=(ClampMin="0.0"))
+	float ChargeActivationRadius = 300.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Tracking", meta=(ClampMin="0.0"))
+	float TrackingSpeed = 250.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Tracking", meta=(ClampMin="0.1"))
+	float TrackingTurnSpeed = 6.0f;
 	
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="AI|Charge", meta=(ClampMin="0.0"))
 	float ChargeWindupDuration = 0.35f;
