@@ -52,6 +52,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Health")
 	float Heal(float Amount);
+
+	UFUNCTION(BlueprintCallable, Category="Health")
+	float GrantHealthReward(float Amount = 1.0f);
 	
 protected:
 	// Called when the game starts
@@ -60,6 +63,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Health", meta=(ClampMin="1.0"))
 	float MaxHealth = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Health", meta=(ClampMin="1.0"))
+	float MaximumHealthLimit = 5.0f;
 	
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "Health")
 	float CurrentHealth = 0.0f;

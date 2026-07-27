@@ -120,6 +120,46 @@ ATinyverseGravityPlanet* ATinyverseCharacter::GetActiveGravityPlanet() const
 	return ActiveGravityPlanet;
 }
 
+void ATinyverseCharacter::CollectCoin()
+{
+	++CoinCount;
+	OnCoinCountChanged.Broadcast(CoinCount);
+
+#if !UE_BUILD_SHIPPING
+	UE_LOG(
+		LogTinyverse,
+		Display,
+		TEXT("%s ha raccolto una moneta. Totale: %d"),
+		*GetNameSafe(this),
+		CoinCount);
+#endif
+
+	if (CoinsPerHealthReward <= 0
+		|| CoinCount % CoinsPerHealthReward != 0
+		|| !IsValid(HealthComponent))
+	{
+		return;
+	}
+
+	const float AppliedReward = HealthComponent->GrantHealthReward(1.0f);
+
+#if !UE_BUILD_SHIPPING
+	UE_LOG(
+		LogTinyverse,
+		Display,
+		TEXT("Soglia monete raggiunta: %d. Ricompensa HP: %.0f, salute: %.0f/%.0f"),
+		CoinCount,
+		AppliedReward,
+		HealthComponent->GetCurrentHealth(),
+		HealthComponent->GetMaxHealth());
+#endif
+}
+
+int32 ATinyverseCharacter::GetCoinCount() const
+{
+	return CoinCount;
+}
+
 void ATinyverseCharacter::UpdatePlanetGravity(float DeltaSeconds)
 {
 	if (!bEnablePlanetGravity)

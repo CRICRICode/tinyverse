@@ -16,6 +16,11 @@ class UTinyverseHealthComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(
+	FTinyverseCoinCountChangedSignature,
+	int32,
+	CoinCount);
+
 /**
  *  A simple player-controllable third person character
  *  Implements a controllable orbiting camera
@@ -62,6 +67,15 @@ public:
 
 	/** Constructor */
 	ATinyverseCharacter();
+
+	UPROPERTY(BlueprintAssignable, Category="Collectibles|Events")
+	FTinyverseCoinCountChangedSignature OnCoinCountChanged;
+
+	UFUNCTION(BlueprintCallable, Category="Collectibles")
+	void CollectCoin();
+
+	UFUNCTION(BlueprintPure, Category="Collectibles")
+	int32 GetCoinCount() const;
 
 	void RegisterGravityPlanet(ATinyverseGravityPlanet* GravityPlanet);
 	void UnregisterGravityPlanet(ATinyverseGravityPlanet* GravityPlanet);
@@ -133,6 +147,12 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
 	float CharacterTurnSpeed = 12.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Collectibles", meta=(AllowPrivateAccess="true", ClampMin="1"))
+	int32 CoinsPerHealthReward = 10;
+
+	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category="Collectibles", meta=(AllowPrivateAccess="true"))
+	int32 CoinCount = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true"))
 	bool bEnablePlanetGravity = true;

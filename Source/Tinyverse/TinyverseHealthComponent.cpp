@@ -15,7 +15,8 @@ void UTinyverseHealthComponent::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	MaxHealth = FMath::Max(MaxHealth, 1.0f);
+	MaximumHealthLimit = FMath::Max(MaximumHealthLimit, 1.0f);
+	MaxHealth = FMath::Clamp(MaxHealth, 1.0f, MaximumHealthLimit);
 	CurrentHealth = MaxHealth;
 	DamageCooldownEndTime = 0.0f;
 	
@@ -96,6 +97,42 @@ float UTinyverseHealthComponent::Heal(float Amount)
 			AppliedHealing);
 	}
 	return AppliedHealing;
+}
+
+float UTinyverseHealthComponent::GrantHealthReward(float Amount)
+{
+	if (Amount <= 0.0f || IsDead())
+	{
+		return 0.0f;
+	}
+
+	if (CurrentHealth < MaxHealth)
+	{
+		return Heal(Amount);
+	}
+
+	const float PreviousMaxHealth = MaxHealth;
+	MaxHealth = FMath::Clamp(
+		MaxHealth + Amount,
+		1.0f,
+		MaximumHealthLimit);
+
+	const float AddedMaximumHealth = MaxHealth - PreviousMaxHealth;
+
+	if (AddedMaximumHealth <= 0.0f)
+	{
+		return 0.0f;
+	}
+
+	CurrentHealth = FMath::Min(CurrentHealth + AddedMaximumHealth, MaxHealth);
+
+	OnHealthChanged.Broadcast(
+		this,
+		CurrentHealth,
+		MaxHealth,
+		AddedMaximumHealth);
+
+	return AddedMaximumHealth;
 }
 
 void UTinyverseHealthComponent::HandleOwnerTakeAnyDamage(
