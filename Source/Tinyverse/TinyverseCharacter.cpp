@@ -5,6 +5,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "DrawDebugHelpers.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
@@ -15,6 +16,7 @@
 #include "Tinyverse.h"
 #include "TinyverseGravityPlanet.h"
 #include "TinyverseHealthComponent.h"
+#include "TinyverseSaveSubsystem.h"
 
 ATinyverseCharacter::ATinyverseCharacter()
 {
@@ -65,6 +67,15 @@ ATinyverseCharacter::ATinyverseCharacter()
 void ATinyverseCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (UGameInstance* GameInstance = GetGameInstance())
+	{
+		if (UTinyverseSaveSubsystem* SaveSubsystem =
+			GameInstance->GetSubsystem<UTinyverseSaveSubsystem>())
+		{
+			SaveSubsystem->TryRestorePlayer(this);
+		}
+	}
 
 	if (bEnablePlanetGravity)
 	{
@@ -158,6 +169,12 @@ void ATinyverseCharacter::CollectCoin()
 int32 ATinyverseCharacter::GetCoinCount() const
 {
 	return CoinCount;
+}
+
+void ATinyverseCharacter::RestoreCoinCount(int32 SavedCoinCount)
+{
+	CoinCount = FMath::Max(0, SavedCoinCount);
+	OnCoinCountChanged.Broadcast(CoinCount);
 }
 
 void ATinyverseCharacter::UpdatePlanetGravity(float DeltaSeconds)

@@ -135,6 +135,29 @@ float UTinyverseHealthComponent::GrantHealthReward(float Amount)
 	return AddedMaximumHealth;
 }
 
+void UTinyverseHealthComponent::RestoreHealthState(
+	float SavedCurrentHealth,
+	float SavedMaxHealth)
+{
+	const float PreviousHealth = CurrentHealth;
+
+	MaxHealth = FMath::Clamp(
+		SavedMaxHealth,
+		1.0f,
+		MaximumHealthLimit);
+	CurrentHealth = FMath::Clamp(
+		SavedCurrentHealth,
+		0.0f,
+		MaxHealth);
+	DamageCooldownEndTime = 0.0;
+
+	OnHealthChanged.Broadcast(
+		this,
+		CurrentHealth,
+		MaxHealth,
+		CurrentHealth - PreviousHealth);
+}
+
 void UTinyverseHealthComponent::HandleOwnerTakeAnyDamage(
 	AActor* DamagedActor,
 	float Damage,

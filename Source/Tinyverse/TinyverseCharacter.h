@@ -77,6 +77,8 @@ public:
 	UFUNCTION(BlueprintPure, Category="Collectibles")
 	int32 GetCoinCount() const;
 
+	void RestoreCoinCount(int32 SavedCoinCount);
+
 	void RegisterGravityPlanet(ATinyverseGravityPlanet* GravityPlanet);
 	void UnregisterGravityPlanet(ATinyverseGravityPlanet* GravityPlanet);
 

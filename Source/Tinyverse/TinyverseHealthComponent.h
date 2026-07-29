@@ -55,6 +55,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Health")
 	float GrantHealthReward(float Amount = 1.0f);
+
+	void RestoreHealthState(float SavedCurrentHealth, float SavedMaxHealth);
 	
 protected:
 	// Called when the game starts
