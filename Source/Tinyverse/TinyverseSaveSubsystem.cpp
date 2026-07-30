@@ -44,6 +44,7 @@ bool UTinyverseSaveSubsystem::SavePlayerState(ATinyverseCharacter* PlayerCharact
 	SaveData->CurrentHealth = PlayerCharacter->GetHealthComponent()->GetCurrentHealth();
 	SaveData->MaxHealth = PlayerCharacter->GetHealthComponent()->GetMaxHealth();
 	SaveData->CoinCount = PlayerCharacter->GetCoinCount();
+	SaveData->RemoveActorIds = RuntimeRemovedActorIds;
 
 	const bool bSaved = UGameplayStatics::SaveGameToSlot(
 		SaveData,
@@ -82,7 +83,8 @@ bool UTinyverseSaveSubsystem::StartNewGame(TSoftObjectPtr<UWorld> NewGameLevel)
 	UGameplayStatics::SetGamePaused(this, false);
 
 	bCreateInitialSavePending = true;
-
+	RuntimeRemovedActorIds.Reset();
+	
 	UGameplayStatics::OpenLevelBySoftObjectPtr(this, NewGameLevel);
 	return true;
 }
@@ -104,6 +106,7 @@ bool UTinyverseSaveSubsystem::ContinueGame()
 
 	PendingSave = SaveData;
 	UGameplayStatics::SetGamePaused(this, false);
+	RuntimeRemovedActorIds = SaveData->RemoveActorIds;
 	UGameplayStatics::OpenLevel(this, FName(*SaveData->SavedLevelPath));
 	return true;
 }
@@ -171,4 +174,19 @@ void UTinyverseSaveSubsystem::TryRestorePlayer(
 #endif
 
 	PendingSave = nullptr;
+}
+
+void UTinyverseSaveSubsystem::MarkActorRemoved(const FGuid& PersistentId)
+{
+	if (!PersistentId.IsValid())
+	{
+		return;
+	}
+	
+	RuntimeRemovedActorIds.Add(PersistentId);
+}
+
+bool UTinyverseSaveSubsystem::IsActorRemoved(const FGuid& PersistentId) const
+{
+	return PersistentId.IsValid() && RuntimeRemovedActorIds.Contains(PersistentId);
 }

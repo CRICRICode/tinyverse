@@ -1,6 +1,7 @@
 #include "TinyverseEnemy.h"
 #include "TinyverseCharacter.h"
 #include "TinyverseHealthComponent.h"
+#include "TinyverseSaveIdentityComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -16,6 +17,10 @@ ATinyverseEnemy::ATinyverseEnemy()
 	EnemyHealthComponent =
 		CreateDefaultSubobject<UTinyverseHealthComponent>(
 			TEXT("HealthComponent"));
+	
+	SaveIdentityComponent =
+		CreateDefaultSubobject<UTinyverseSaveIdentityComponent>(
+				TEXT("SaveIdentityComponent"));
 	
 	StompTrigger = CreateDefaultSubobject<UCapsuleComponent>(TEXT("StompTrigger"));
 	StompTrigger->SetupAttachment(GetCapsuleComponent());
@@ -198,6 +203,12 @@ void ATinyverseEnemy::UpdateGravity()
 void ATinyverseEnemy::BeginPlay()
 {
 	Super::BeginPlay();
+	
+	if (IsValid(SaveIdentityComponent) && SaveIdentityComponent->IsOwnerMarkedAsRemoved())
+	{
+		Destroy();
+		return;
+	}
 
 	if (IsValid(EnemyHealthComponent))
 	{
@@ -451,7 +462,12 @@ void ATinyverseEnemy::HandleDeath(
 		*GetNameSafe(this),
 		*GetNameSafe(DamageCauser));
 #endif
-
+	
+	if (IsValid(SaveIdentityComponent))
+	{
+		SaveIdentityComponent->MarkOwnerAsRemoved();
+	}
+	
 	Destroy();
 }
 

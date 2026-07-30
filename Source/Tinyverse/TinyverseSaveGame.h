@@ -13,7 +13,7 @@ class TINYVERSE_API UTinyverseSaveGame : public USaveGame
 
 public:
 	UPROPERTY(SaveGame)
-	int32 SaveVersion = 1;
+	int32 SaveVersion = 2;
 
 	UPROPERTY(SaveGame)
 	FString SavedLevelPath;
@@ -29,4 +29,7 @@ public:
 
 	UPROPERTY(SaveGame)
 	int32 CoinCount = 0;
+	
+	UPROPERTY(SaveGame)
+	TSet<FGuid> RemoveActorIds;
 };

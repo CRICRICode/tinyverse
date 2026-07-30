@@ -29,14 +29,23 @@ public:
 	UFUNCTION(BlueprintPure, Category="Tinyverse|Save")
 	bool DoesSaveExist() const;
 
+	UFUNCTION(BlueprintCallable, Category="Tinyverse|Save")
+	void MarkActorRemoved(const FGuid& PersistentId);
+
+	UFUNCTION(BlueprintPure, Category="Tinyverse|Save")
+	bool IsActorRemoved(const FGuid& PersistentId) const;
+	
 	void TryRestorePlayer(ATinyverseCharacter* PlayerCharacter);
 
 private:
 	static const FString SaveSlotName;
 	static constexpr int32 SaveUserIndex = 0;
-	static constexpr int32 CurrentSaveVersion = 1;
+	static constexpr int32 CurrentSaveVersion = 2;
 	bool bCreateInitialSavePending = false;
 	bool SavePlayerState(ATinyverseCharacter* PlayerCharacter);
+	
+	UPROPERTY(Transient)
+	TSet<FGuid> RuntimeRemovedActorIds;
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTinyverseSaveGame> PendingSave;

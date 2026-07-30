@@ -11,6 +11,7 @@ class USphereComponent;
 class UPrimitiveComponent;
 struct FHitResult;
 class UTinyverseHealthComponent;
+class UTinyverseSaveIdentityComponent;
 
 UENUM(BlueprintType)
 enum class ETinyverseEnemyChargePhase : uint8
@@ -68,6 +69,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
 	UTinyverseHealthComponent* EnemyHealthComponent = nullptr;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
+	TObjectPtr<UTinyverseSaveIdentityComponent> SaveIdentityComponent = nullptr;
 	
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="State")
 	bool bIsDefeated = false;
