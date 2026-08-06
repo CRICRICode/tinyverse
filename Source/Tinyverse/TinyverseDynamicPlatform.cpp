@@ -2,6 +2,8 @@
 
 
 #include "TinyverseDynamicPlatform.h"
+
+#include "TimerManager.h"
 #include "Components/StaticMeshComponent.h"
 
 
@@ -23,7 +25,7 @@ void ATinyverseDynamicPlatform::BeginPlay()
 	Super::BeginPlay();
 
 	StartLocation = GetActorLocation();
-	EndLocation = StartLocation	+ GetActorTransform().TransformVectorNoScale(MovementOffset);
+	EndLocation = StartLocation + GetActorTransform().TransformVectorNoScale(MovementOffset);
 }
 
 // Called every frame
@@ -40,7 +42,7 @@ void ATinyverseDynamicPlatform::PlatformSlide(float DeltaTime)
 	{
 		return;
 	}
-	
+
 	const FVector TargetLocation = bIsMovingToEnd ? EndLocation : StartLocation;
 
 	const FVector NewLocation = FMath::VInterpConstantTo(
@@ -50,11 +52,22 @@ void ATinyverseDynamicPlatform::PlatformSlide(float DeltaTime)
 		MovementSpeed);
 
 	SetActorLocation(NewLocation);
-	
+
 	if (GetActorLocation().Equals(TargetLocation, 1.0f))
 	{
-		bIsMovingToEnd = !bIsMovingToEnd;
+		SetActorTickEnabled(false);
+
+		GetWorldTimerManager().SetTimer(
+			PlatformWaitTimer,
+			this,
+			&ATinyverseDynamicPlatform::ResumePlatformMovement,
+			WaitDuration,
+			false);
 	}
-	
-	
+}
+
+void ATinyverseDynamicPlatform::ResumePlatformMovement()
+{
+	bIsMovingToEnd = !bIsMovingToEnd;
+	SetActorTickEnabled(true);
 }

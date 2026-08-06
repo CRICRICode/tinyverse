@@ -40,6 +40,12 @@ protected:
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Platform Movement")
 	bool bIsMovingToEnd = true;
+	
+	
+	FTimerHandle PlatformWaitTimer;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Platform Movement", meta=(ClampMin="0.0"))
+	float WaitDuration = 5.0f;
 
 public:	
 	// Called every frame
@@ -48,5 +54,8 @@ public:
 	
 	void PlatformSlide (
 		float DeltaTime);
+	
+	void ResumePlatformMovement();
+	
 	
 };

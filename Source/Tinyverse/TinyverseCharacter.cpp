@@ -119,11 +119,6 @@ void ATinyverseCharacter::UnregisterGravityPlanet(
 	ATinyverseGravityPlanet* GravityPlanet)
 {
 	NearbyGravityPlanets.RemoveSingleSwap(GravityPlanet);
-
-	if (ActiveGravityPlanet == GravityPlanet)
-	{
-		ActiveGravityPlanet = nullptr;
-	}
 }
 
 ATinyverseGravityPlanet* ATinyverseCharacter::GetActiveGravityPlanet() const
@@ -191,21 +186,36 @@ void ATinyverseCharacter::UpdatePlanetGravity(float DeltaSeconds)
 		return;
 	}
 
+	UWorld* World = GetWorld();
+
+	if (!IsValid(World))
+	{
+		return;
+	}
+
 	const FVector CharacterLocation = GetActorLocation();
+	ATinyverseGravityPlanet* PreviousGravityPlanet = ActiveGravityPlanet.Get();
 
-	NearbyGravityPlanets.RemoveAllSwap(
-		[CharacterLocation](const TObjectPtr<ATinyverseGravityPlanet>& Planet)
+	// Rebuild the candidates so a missed overlap cannot leave gravity disabled.
+	NearbyGravityPlanets.Reset();
+
+	for (TActorIterator<ATinyverseGravityPlanet> PlanetIterator(World);
+		PlanetIterator;
+		++PlanetIterator)
+	{
+		ATinyverseGravityPlanet* Planet = *PlanetIterator;
+
+		if (IsValid(Planet)
+			&& Planet->IsLocationWithinInfluence(CharacterLocation))
 		{
-			return !IsValid(Planet)
-				|| !Planet->IsLocationWithinInfluence(CharacterLocation);
-		});
+			NearbyGravityPlanets.Add(Planet);
+		}
+	}
 
-	ATinyverseGravityPlanet* StrongestPlanet = nullptr;
-	float StrongestGravity = 0.0f;
-	float ActivePriority = 0.0f;
+	ATinyverseGravityPlanet* BestPlanet = nullptr;
+	float BestScore = TNumericLimits<float>::Max();
+	float ActiveScore = TNumericLimits<float>::Max();
 	bool bActivePlanetIsCandidate = false;
-	ATinyverseGravityPlanet* ClosestSurfacePlanet = nullptr;
-	float ClosestSurfaceDistance = TNumericLimits<float>::Max();
 
 	for (ATinyverseGravityPlanet* Planet : NearbyGravityPlanets)
 	{
@@ -214,30 +224,20 @@ void ATinyverseCharacter::UpdatePlanetGravity(float DeltaSeconds)
 			continue;
 		}
 
-		const float GravityPriority =
-			Planet->GetGravityPriorityAtLocation(CharacterLocation);
-		const float DistanceFromSurface = FMath::Max(
-			0.0f,
-			FVector::Distance(Planet->GetActorLocation(), CharacterLocation)
-			- Planet->GetPlanetRadius());
-
-		if (DistanceFromSurface <= GravitySurfaceCaptureDistance
-			&& DistanceFromSurface < ClosestSurfaceDistance)
-		{
-			ClosestSurfaceDistance = DistanceFromSurface;
-			ClosestSurfacePlanet = Planet;
-		}
+		const float SelectionScore =
+			Planet->GetGravitySelectionScoreAtLocation(CharacterLocation);
 
 		if (Planet == ActiveGravityPlanet)
 		{
-			ActivePriority = GravityPriority;
-			bActivePlanetIsCandidate = GravityPriority > 0.0f;
+			ActiveScore = SelectionScore;
+			bActivePlanetIsCandidate =
+				SelectionScore < TNumericLimits<float>::Max();
 		}
 
-		if (GravityPriority > StrongestGravity)
+		if (SelectionScore < BestScore)
 		{
-			StrongestGravity = GravityPriority;
-			StrongestPlanet = Planet;
+			BestScore = SelectionScore;
+			BestPlanet = Planet;
 		}
 	}
 
@@ -249,38 +249,45 @@ void ATinyverseCharacter::UpdatePlanetGravity(float DeltaSeconds)
 			Movement->CurrentFloor.HitResult.GetActor());
 	}
 
-	if (IsValid(ClosestSurfacePlanet))
-	{
-		ActiveGravityPlanet = ClosestSurfacePlanet;
-		bActivePlanetIsCandidate = true;
-	}
-	else if (IsValid(GroundPlanet)
-		&& GroundPlanet->IsLocationWithinInfluence(CharacterLocation))
+	const bool bGroundedOnGravityPlanet = IsValid(GroundPlanet)
+		&& GroundPlanet->IsLocationWithinInfluence(CharacterLocation);
+
+	if (bGroundedOnGravityPlanet)
 	{
 		NearbyGravityPlanets.AddUnique(GroundPlanet);
 		ActiveGravityPlanet = GroundPlanet;
 		bActivePlanetIsCandidate = true;
 	}
 
-	const bool bKeepGroundedSource = bLockGravitySourceWhileGrounded
-		&& Movement->IsMovingOnGround()
-		&& !IsValid(GroundPlanet)
-		&& bActivePlanetIsCandidate;
-
-	if (!IsValid(ClosestSurfacePlanet)
-		&& !IsValid(GroundPlanet)
+	if (!bGroundedOnGravityPlanet
 		&& !bActivePlanetIsCandidate)
 	{
-		ActiveGravityPlanet = StrongestPlanet;
+		ActiveGravityPlanet = BestPlanet;
 	}
-	else if (!IsValid(ClosestSurfacePlanet)
-		&& !IsValid(GroundPlanet)
-		&& !bKeepGroundedSource
-		&& StrongestPlanet != ActiveGravityPlanet
-		&& StrongestGravity > ActivePriority * FMath::Max(1.0f, GravitySwitchRatio))
+	else if (!bGroundedOnGravityPlanet
+		&& IsValid(BestPlanet)
+		&& BestPlanet != ActiveGravityPlanet
+		&& BestScore * FMath::Max(1.0f, GravitySwitchRatio) < ActiveScore)
 	{
-		ActiveGravityPlanet = StrongestPlanet;
+		ActiveGravityPlanet = BestPlanet;
 	}
+
+	const bool bGravitySourceChanged =
+		PreviousGravityPlanet != ActiveGravityPlanet.Get();
+
+#if !UE_BUILD_SHIPPING
+	if (bShowGravityDebug && bGravitySourceChanged)
+	{
+		UE_LOG(
+			LogTinyverse,
+			Display,
+			TEXT("Gravity source changed for %s: %s -> %s (best score: %.4f)"),
+			*GetNameSafe(this),
+			*GetNameSafe(PreviousGravityPlanet),
+			*GetNameSafe(ActiveGravityPlanet),
+			BestScore);
+	}
+#endif
 
 	if (!IsValid(ActiveGravityPlanet))
 	{
@@ -301,36 +308,53 @@ void ATinyverseCharacter::UpdatePlanetGravity(float DeltaSeconds)
 		return;
 	}
 
-	FVector NewGravityDirection = DesiredGravityDirection;
+	Movement->SetGravityDirection(DesiredGravityDirection);
 
-	if (bHasPlanetGravityDirection
-		&& DeltaSeconds > 0.0f
+	if (!bHasPlanetGravityDirection)
+	{
+		VisualGravityDirection = DesiredGravityDirection;
+	}
+	else if (DeltaSeconds > 0.0f
 		&& GravityDirectionRotationSpeed > 0.0f)
 	{
-		NewGravityDirection = FMath::VInterpNormalRotationTo(
-			Movement->GetGravityDirection().GetSafeNormal(),
+		VisualGravityDirection = FMath::VInterpNormalRotationTo(
+			VisualGravityDirection.GetSafeNormal(),
 			DesiredGravityDirection,
 			DeltaSeconds,
 			GravityDirectionRotationSpeed);
 	}
+	else
+	{
+		VisualGravityDirection = DesiredGravityDirection;
+	}
 
-	Movement->SetGravityDirection(NewGravityDirection);
+	if (VisualGravityDirection.IsNearlyZero())
+	{
+		VisualGravityDirection = DesiredGravityDirection;
+	}
+
+	VisualGravityDirection.Normalize();
+
 	bHasPlanetGravityDirection = true;
 
-	const UWorld* World = GetWorld();
-	const float BaseGravity = IsValid(World)
-		                          ? FMath::Abs(World->GetGravityZ())
-		                          : 0.0f;
+	const float BaseGravity = FMath::Abs(World->GetGravityZ());
 
 	Movement->GravityScale = BaseGravity > KINDA_SMALL_NUMBER
 		                         ? CurrentGravityStrength / BaseGravity
 		                         : 0.0f;
 
+	if (bGravitySourceChanged
+		&& Movement->IsMovingOnGround()
+		&& !bGroundedOnGravityPlanet)
+	{
+		Movement->SetMovementMode(MOVE_Falling);
+	}
+
 #if !UE_BUILD_SHIPPING
 	if (bShowGravityDebug)
 	{
 		const FVector ArrowStart = CharacterLocation;
-		const FVector ArrowEnd = ArrowStart + NewGravityDirection * 180.0f;
+		const FVector ArrowEnd = ArrowStart + DesiredGravityDirection * 180.0f;
 
 		DrawDebugDirectionalArrow(
 			GetWorld(),
@@ -487,6 +511,11 @@ void ATinyverseCharacter::DoJumpEnd()
 
 FVector ATinyverseCharacter::GetLocalUp() const
 {
+	if (bHasPlanetGravityDirection && !VisualGravityDirection.IsNearlyZero())
+	{
+		return -VisualGravityDirection.GetSafeNormal();
+	}
+
 	const FVector GravityDirection = GetCharacterMovement()->GetGravityDirection();
 
 	if (GravityDirection.IsNearlyZero())

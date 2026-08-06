@@ -86,28 +86,23 @@ float ATinyverseGravityPlanet::GetGravityStrengthAtLocation(
 		* GravityMultiplier;
 }
 
-float ATinyverseGravityPlanet::GetGravityPriorityAtLocation(
+float ATinyverseGravityPlanet::GetGravitySelectionScoreAtLocation(
 	const FVector& WorldLocation) const
 {
-	if (!IsLocationWithinInfluence(WorldLocation))
+	const float GravityStrength = GetGravityStrengthAtLocation(WorldLocation);
+
+	if (GravityStrength <= KINDA_SMALL_NUMBER)
 	{
-		return 0.0f;
+		return TNumericLimits<float>::Max();
 	}
 
 	const float Radius = GetPlanetRadius();
-	const float Influence = GetInfluenceRadius();
 	const float DistanceFromCenter =
 		FVector::Distance(GetActorLocation(), WorldLocation);
 	const float DistanceFromSurface =
 		FMath::Max(0.0f, DistanceFromCenter - Radius);
-	const float InfluenceDepth = FMath::Max(1.0f, Influence - Radius);
-	const float ProximityToSurface = 1.0f
-		- FMath::Clamp(DistanceFromSurface / InfluenceDepth, 0.0f, 1.0f);
 
-	return FMath::Max(0.0f, SurfaceGravity)
-		* FMath::Pow(
-			ProximityToSurface,
-			FMath::Max(0.0f, GravitySelectionFalloffExponent));
+	return DistanceFromSurface / GravityStrength;
 }
 
 float ATinyverseGravityPlanet::GetPlanetRadius() const

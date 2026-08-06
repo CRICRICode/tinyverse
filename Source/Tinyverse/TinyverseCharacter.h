@@ -60,7 +60,7 @@ protected:
 	UInputAction* MouseLookAction;
 	
 	/**  Debug gravity arrow*/
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Debug|Gravity")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Debug|Gravity", meta=(ToolTip="Shows the active gravity direction and logs every gravity source change. Development builds only."))
 	bool bShowGravityDebug=false;
 
 public:
@@ -156,20 +156,14 @@ private:
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category="Collectibles", meta=(AllowPrivateAccess="true"))
 	int32 CoinCount = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ToolTip="Enables the custom planetary gravity system for this character."))
 	bool bEnablePlanetGravity = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ClampMin="1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ClampMin="1.0", ToolTip="How much better a new planet's selection score must be before replacing the active planet. Use 1.0 for no hysteresis."))
 	float GravitySwitchRatio = 1.15f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm"))
-	float GravitySurfaceCaptureDistance = 250.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="deg/s"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="deg/s", ToolTip="Rotation speed used to visually align the character and camera with the active gravity direction. Physical gravity changes immediately."))
 	float GravityDirectionRotationSpeed = 540.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true"))
-	bool bLockGravitySourceWhileGrounded = true;
 
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Transient, Category="Movement|Planet|Gravity", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<ATinyverseGravityPlanet> ActiveGravityPlanet;
@@ -233,6 +227,8 @@ private:
 	float TimeSinceLastCameraInput = 0.0f;
 
 	float ForwardMovementInput = 0.0f;
+
+	FVector VisualGravityDirection = FVector::DownVector;
 
 	bool bGravityAlignedCameraInitialized = false;
 
