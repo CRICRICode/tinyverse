@@ -64,3 +64,18 @@ Saved/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# ============================================================
+# FMOD
+# ============================================================
+!Plugins/FMODStudio/Binaries/
+!Plugins/FMODStudio/Binaries/**
+FMODProject/.cache/
+FMODProject/.user/
+FMODProject/Build/
+
+Plugins/FMODStudio/Docs/
+
+Plugins/FMODStudio/Binaries/Win64/UnrealEditor-*
+Plugins/FMODStudio/Binaries/Win64/*.pdb
+Plugins/FMODStudio/Binaries/Win64/*.modules
