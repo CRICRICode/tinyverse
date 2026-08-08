@@ -18,7 +18,8 @@ public class Tinyverse : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			"FMODStudio"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });

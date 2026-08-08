@@ -4,6 +4,7 @@
 #include "Engine/LocalPlayer.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/GameInstance.h"
 #include "Engine/World.h"
@@ -13,6 +14,8 @@
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
 #include "InputActionValue.h"
+#include "FMODBlueprintStatics.h"
+#include "FMODEvent.h"
 #include "Tinyverse.h"
 #include "TinyverseGravityPlanet.h"
 #include "TinyverseHealthComponent.h"
@@ -67,6 +70,27 @@ ATinyverseCharacter::ATinyverseCharacter()
 void ATinyverseCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (!IsValid(FootstepEvent) && !FootstepEventPath.IsEmpty())
+	{
+		ResolveFMODEvent(FootstepEvent, FootstepEventPath);
+	}
+
+	ResolveFMODEvent(JumpEvent, JumpEventPath);
+	ResolveFMODEvent(CoinCollectedEvent, CoinCollectedEventPath);
+	ResolveFMODEvent(HealthRewardEvent, HealthRewardEventPath);
+
+#if !UE_BUILD_SHIPPING
+	if (!IsValid(FootstepEvent))
+	{
+		UE_LOG(
+			LogTinyverse,
+			Warning,
+			TEXT("Footstep FMOD event not found for %s: %s"),
+			*GetNameSafe(this),
+			*FootstepEventPath);
+	}
+#endif
 
 	if (UGameInstance* GameInstance = GetGameInstance())
 	{
@@ -126,10 +150,72 @@ ATinyverseGravityPlanet* ATinyverseCharacter::GetActiveGravityPlanet() const
 	return ActiveGravityPlanet;
 }
 
+UFMODEvent* ATinyverseCharacter::ResolveFMODEvent(
+	TObjectPtr<UFMODEvent>& EventReference,
+	const FString& EventPath)
+{
+	if (!IsValid(EventReference) && !EventPath.IsEmpty())
+	{
+		EventReference = UFMODBlueprintStatics::FindEventByName(EventPath);
+	}
+
+	return EventReference.Get();
+}
+
+void ATinyverseCharacter::PlayFMODEvent(
+	TObjectPtr<UFMODEvent>& EventReference,
+	const FString& EventPath,
+	const FTransform& EventTransform)
+{
+	if (UFMODEvent* Event = ResolveFMODEvent(EventReference, EventPath))
+	{
+		UFMODBlueprintStatics::PlayEventAtLocation(
+			this,
+			Event,
+			EventTransform,
+			true);
+	}
+}
+
+void ATinyverseCharacter::PlayFootstep(FName FootSocketName)
+{
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	USkeletalMeshComponent* CharacterMesh = GetMesh();
+
+	if (!IsValid(Movement)
+		|| !IsValid(CharacterMesh)
+		|| !Movement->IsMovingOnGround()
+		|| GetVelocity().SizeSquared() < FMath::Square(MinimumFootstepSpeed))
+	{
+		return;
+	}
+
+	FTransform FootstepTransform = GetActorTransform();
+
+	if (!FootSocketName.IsNone()
+		&& (CharacterMesh->DoesSocketExist(FootSocketName)
+			|| CharacterMesh->GetBoneIndex(FootSocketName) != INDEX_NONE))
+	{
+		FootstepTransform = CharacterMesh->GetSocketTransform(
+			FootSocketName,
+			RTS_World);
+	}
+
+	PlayFMODEvent(
+		FootstepEvent,
+		FootstepEventPath,
+		FootstepTransform);
+}
+
 void ATinyverseCharacter::CollectCoin()
 {
 	++CoinCount;
 	OnCoinCountChanged.Broadcast(CoinCount);
+
+	PlayFMODEvent(
+		CoinCollectedEvent,
+		CoinCollectedEventPath,
+		GetActorTransform());
 
 #if !UE_BUILD_SHIPPING
 	UE_LOG(
@@ -148,6 +234,14 @@ void ATinyverseCharacter::CollectCoin()
 	}
 
 	const float AppliedReward = HealthComponent->GrantHealthReward(1.0f);
+
+	if (AppliedReward > 0.0f)
+	{
+		PlayFMODEvent(
+			HealthRewardEvent,
+			HealthRewardEventPath,
+			GetActorTransform());
+	}
 
 #if !UE_BUILD_SHIPPING
 	UE_LOG(
@@ -376,7 +470,7 @@ void ATinyverseCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
 		// Jumping
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ATinyverseCharacter::DoJumpStart);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
 		// Moving
@@ -499,8 +593,17 @@ void ATinyverseCharacter::DoLook(float Yaw, float Pitch)
 
 void ATinyverseCharacter::DoJumpStart()
 {
-	// signal the character to jump
+	const bool bCanJumpNow = CanJump();
+
 	Jump();
+
+	if (bCanJumpNow)
+	{
+		PlayFMODEvent(
+			JumpEvent,
+			JumpEventPath,
+			GetActorTransform());
+	}
 }
 
 void ATinyverseCharacter::DoJumpEnd()

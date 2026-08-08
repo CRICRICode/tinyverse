@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objects serializationModel="Studio.02.03.00">
+	<object class="AudioFile" id="{1be67290-fe53-4957-bd64-2da1c67f4e95}">
+		<property name="assetPath">
+			<value>SFX/Player/Health/HealthUp.wav</value>
+		</property>
+		<property name="frequencyInKHz">
+			<value>48</value>
+		</property>
+		<property name="channelCount">
+			<value>1</value>
+		</property>
+		<property name="length">
+			<value>1.3191875</value>
+		</property>
+		<relationship name="masterAssetFolder">
+			<destination>{b210e1be-6116-4f9e-a2ab-d177222bda8a}</destination>
+		</relationship>
+	</object>
+</objects>

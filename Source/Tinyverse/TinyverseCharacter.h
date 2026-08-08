@@ -10,6 +10,7 @@
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UFMODEvent;
 class ATinyverseGravityPlanet;
 struct FInputActionValue;
 class UTinyverseHealthComponent;
@@ -85,6 +86,9 @@ public:
 	UFUNCTION(BlueprintPure, Category="Movement|Planet|Gravity")
 	ATinyverseGravityPlanet* GetActiveGravityPlanet() const;
 
+	UFUNCTION(BlueprintCallable, Category="Audio|Footsteps")
+	void PlayFootstep(FName FootSocketName);
+
 protected:
 
 	virtual void BeginPlay() override;
@@ -135,6 +139,15 @@ public:
 private:
 	void UpdatePlanetGravity(float DeltaSeconds);
 
+	UFMODEvent* ResolveFMODEvent(
+		TObjectPtr<UFMODEvent>& EventReference,
+		const FString& EventPath);
+
+	void PlayFMODEvent(
+		TObjectPtr<UFMODEvent>& EventReference,
+		const FString& EventPath,
+		const FTransform& EventTransform);
+
 	FVector GetLocalUp() const;
 
 	void InitializeGravityAlignedCamera();
@@ -149,6 +162,33 @@ private:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Movement|Planet", meta=(AllowPrivateAccess="true", ClampMin="0.01"))
 	float CharacterTurnSpeed = 12.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Footsteps", meta=(AllowPrivateAccess="true", ToolTip="FMOD event played by footstep animation notifies. If empty, the event path below is resolved at runtime."))
+	TObjectPtr<UFMODEvent> FootstepEvent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Footsteps", meta=(AllowPrivateAccess="true", ToolTip="Fallback FMOD Studio path used when Footstep Event is not assigned in the Character Blueprint."))
+	FString FootstepEventPath = TEXT("event:/SFX/Player/FootSteps");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Footsteps", meta=(AllowPrivateAccess="true", ClampMin="0.0", Units="cm/s", ToolTip="Footstep notifies are ignored below this character speed."))
+	float MinimumFootstepSpeed = 10.0f;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Player", meta=(AllowPrivateAccess="true", ToolTip="FMOD event played when the character successfully starts a jump."))
+	TObjectPtr<UFMODEvent> JumpEvent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Player", meta=(AllowPrivateAccess="true", ToolTip="Fallback FMOD Studio path used when Jump Event is not assigned in the Character Blueprint."))
+	FString JumpEventPath = TEXT("event:/SFX/Player/Jump");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Collectibles", meta=(AllowPrivateAccess="true", ToolTip="FMOD event played whenever a coin is collected."))
+	TObjectPtr<UFMODEvent> CoinCollectedEvent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Collectibles", meta=(AllowPrivateAccess="true", ToolTip="Fallback FMOD Studio path used when Coin Collected Event is not assigned in the Character Blueprint."))
+	FString CoinCollectedEventPath = TEXT("event:/SFX/Collectible/Coin");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Player", meta=(AllowPrivateAccess="true", ToolTip="FMOD event played when a coin milestone actually restores or increases health."))
+	TObjectPtr<UFMODEvent> HealthRewardEvent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio|Player", meta=(AllowPrivateAccess="true", ToolTip="Fallback FMOD Studio path used when Health Reward Event is not assigned in the Character Blueprint."))
+	FString HealthRewardEventPath = TEXT("event:/SFX/Player/Health");
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Collectibles", meta=(AllowPrivateAccess="true", ClampMin="1"))
 	int32 CoinsPerHealthReward = 10;

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<objects serializationModel="Studio.02.03.00">
+	<object class="Workspace" id="{232d9c8d-938a-4b29-bec6-be7140446dbf}">
+		<property name="builtBanksOutputDirectory">
+			<value>../../../Github/Master/GameEngine/Platform3D/Tinyverse/Content/FMOD</value>
+		</property>
+		<relationship name="masterEventFolder">
+			<destination>{1f0e0087-3e81-4227-bf9a-a5ba1f19f45c}</destination>
+		</relationship>
+		<relationship name="masterTagFolder">
+			<destination>{8f1fc660-e934-41dc-959b-cde635a36fe5}</destination>
+		</relationship>
+		<relationship name="masterEffectPresetFolder">
+			<destination>{18593474-c959-448f-b7ae-866c1a767d67}</destination>
+		</relationship>
+		<relationship name="masterParameterPresetFolder">
+			<destination>{664760d7-7d54-4a32-8bf3-45e09fc6fbb6}</destination>
+		</relationship>
+		<relationship name="masterBankFolder">
+			<destination>{4cf5bd38-5529-4cbf-ad5a-a5e1c2e7e6c8}</destination>
+		</relationship>
+		<relationship name="masterSandboxFolder">
+			<destination>{ae163511-337c-449e-adc5-8bd1db81e649}</destination>
+		</relationship>
+		<relationship name="masterAssetFolder">
+			<destination>{b210e1be-6116-4f9e-a2ab-d177222bda8a}</destination>
+		</relationship>
+		<relationship name="mixer">
+			<destination>{0d72fd8f-bad4-4f23-a001-ca004f43448f}</destination>
+		</relationship>
+		<relationship name="profilerSessionFolder">
+			<destination>{7cf2a2f1-6447-4629-a9e1-8d30d9177605}</destination>
+		</relationship>
+		<relationship name="platforms">
+			<destination>{5acb3009-9b40-42a3-b988-b79c475a82bb}</destination>
+		</relationship>
+	</object>
+</objects>
