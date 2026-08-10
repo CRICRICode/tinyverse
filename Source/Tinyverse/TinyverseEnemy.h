@@ -9,6 +9,7 @@
 class UCapsuleComponent;
 class USphereComponent;
 class UPrimitiveComponent;
+class UFMODEvent;
 struct FHitResult;
 class UTinyverseHealthComponent;
 class UTinyverseSaveIdentityComponent;
@@ -75,6 +76,12 @@ protected:
 	
 	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category="State")
 	bool bIsDefeated = false;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio", meta=(ToolTip="FMOD event played at the enemy location when it is defeated. If empty, the event path below is resolved at runtime."))
+	TObjectPtr<UFMODEvent> DeathEvent;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Audio", meta=(ToolTip="Fallback FMOD Studio path used when Death Event is not assigned in the Enemy Blueprint."))
+	FString DeathEventPath = TEXT("event:/SFX/Enemy/Killed");
 	
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Stomp", meta=(ClampMin="0.0"))
 	float StompBounceSpeed = 600.0f;

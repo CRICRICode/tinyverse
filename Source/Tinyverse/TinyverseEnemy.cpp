@@ -7,6 +7,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/DamageType.h"
 #include "Kismet/GameplayStatics.h"
+#include "FMODBlueprintStatics.h"
+#include "FMODEvent.h"
 
 
 ATinyverseEnemy::ATinyverseEnemy()
@@ -453,6 +455,31 @@ void ATinyverseEnemy::HandleDeath(
 	
 	CancelCharge();
 	bIsDefeated = true;
+
+	if (!IsValid(DeathEvent) && !DeathEventPath.IsEmpty())
+	{
+		DeathEvent = UFMODBlueprintStatics::FindEventByName(DeathEventPath);
+	}
+
+	if (IsValid(DeathEvent))
+	{
+		UFMODBlueprintStatics::PlayEventAtLocation(
+			this,
+			DeathEvent,
+			GetActorTransform(),
+			true);
+	}
+#if !UE_BUILD_SHIPPING
+	else
+	{
+		UE_LOG(
+			LogTemp,
+			Warning,
+			TEXT("Enemy death FMOD event not found for %s: %s"),
+			*GetNameSafe(this),
+			*DeathEventPath);
+	}
+#endif
 	
 #if !UE_BUILD_SHIPPING
 	UE_LOG(
