@@ -1,4 +1,4 @@
-# Tinyverse
+# Tinyverse [![Download Zip](https://img.shields.io/badge/download-v0.1.0-blue)](https://github.com/CRICRICode/tinyverse/releases/download/v1.0.0/Tinyverse.zip)
 
 **Tinyverse** è un platform 3D in terza persona ambientato su piccoli pianeti, sviluppato principalmente in **C++ con Unreal Engine 5.8** per il progetto di GameEngine. Il giocatore esplora superfici sferiche, salta tra pianeti e piattaforme mobili, raccoglie monete e affronta nemici che pattugliano, inseguono e attaccano con una carica.
 
